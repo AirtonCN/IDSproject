@@ -96,6 +96,10 @@ ipvar HOME_NET [192.168.1.x]  # solo tu host
 ```
 ipvar EXTERNAL_NET !$HOME_NET
 ```
+Verificar la configuracion del archivo .conf
+```bash
+sudo snort -T -c /etc/snort/snort.conf
+```
 
 
 
