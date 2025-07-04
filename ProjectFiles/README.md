@@ -90,16 +90,20 @@ scp archivo.txt uadministrator@192.168.1.201:/home/usuario/
 ## Configurar IDS
 Configurar Snort para ignorar ciertas IPs usando pass rules o HOME_NET en el archivo /etc/snort/snort.conf, todo esto se configurara en otro archivo llamado, ids.conf:
 
+Ip victima (linea 65)
 ```
-ipvar HOME_NET [192.168.1.x]  # solo tu host
+ipvar HOME_NET [192.168.1.201]  # solo tu host
 ```
+IP de donde proviene el trafico (linea 74)
 ```
-ipvar EXTERNAL_NET !$HOME_NET
+ipvar EXTERNAL_NET [192.168.1.25]
 ```
 Verificar la configuracion del archivo .conf
 ```bash
 sudo snort -T -c /etc/snort/snort.conf
 ```
+
+
 
 
 
