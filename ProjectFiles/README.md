@@ -88,13 +88,14 @@ scp archivo.txt uadministrator@192.168.1.201:/home/usuario/
 
 
 ## Configurar IDS
+
 Configurar Snort para ignorar ciertas IPs usando pass rules o HOME_NET en el archivo /etc/snort/snort.conf, todo esto se configurara en otro archivo llamado, ids.conf:
 
 Ip victima (linea 65)
 ```
 ipvar HOME_NET [192.168.1.201]  # solo tu host
 ```
-IP de donde proviene el trafico (linea 74)
+IP de donde proviene el trafico (linea 75)
 ```
 ipvar EXTERNAL_NET [192.168.1.25]
 ```
@@ -102,6 +103,11 @@ Verificar la configuracion del archivo .conf
 ```bash
 sudo snort -T -c /etc/snort/snort.conf
 ```
+Se agrega una regla al archivo /etc/snort/rules/local.rules, para detectar intentos de conexión SSH
+```
+alert tcp any any -> $HOME_NET 22 (msg:"[Snort IDS] SSH Access Attempt"; sid:1000010; rev:1;)
+```
+
 
 
 
