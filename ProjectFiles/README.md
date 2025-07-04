@@ -71,7 +71,7 @@ https://nmap.org/
 
 Generar tráfico malicioso con nmap
 ```powershell
-nmap -sS [IP de la VM Snort]
+nmap -sT -Pn 192.168.1.201
 ```
 Descargar archivo del server linux
 
