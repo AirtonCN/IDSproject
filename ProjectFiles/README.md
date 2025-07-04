@@ -93,9 +93,14 @@ Configurar Snort para ignorar ciertas IPs usando pass rules o HOME_NEEn el archi
 ```
 ipvar HOME_NET [192.168.1.x]  # solo tu host
 ```
+o
 ```
 ipvar EXTERNAL_NET !$HOME_NET
 ```
+Agrega la regla ejemplo deteccion de intetno SSHH en el acrhivo /etc/snort/rules/local.rules
+```
+alert tcp any any -> $HOME_NET 22 (msg:"[Snort IDS] SSH Access Attempt"; sid:1000010; rev:1;)
+``` 
 
 
 
