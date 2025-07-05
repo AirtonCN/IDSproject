@@ -36,6 +36,39 @@ Aplicar cambios directamente
 ```bash
 sudo netplan apply
 ```
+### Configurar Azure Arc para visualizar el servidor on-premise como un recurso mas de azure
+
+Pasos a seguir:
+* Ingresamos a Azure portal Azure Arc 
+* Machines 
+* Add a single machine 
+* Generamos y descargamos el script
+```bash
+export subscriptionId="a8cbb876-3c0b-41e0-914a-8b378aa251a1";
+export resourceGroup="testenvironment02";
+export tenantId="97ddd0b5-4ba0-4f0f-9887-6cc62ff2e6f6";
+export location="eastus";
+export authType="token";
+export correlationId="d651ce4a-6c03-4870-b798-6f7357156657";
+export cloud="AzureCloud";
+
+
+# Download the installation package
+LINUX_INSTALL_SCRIPT="/tmp/install_linux_azcmagent.sh"
+if [ -f "$LINUX_INSTALL_SCRIPT" ]; then rm -f "$LINUX_INSTALL_SCRIPT"; fi;
+output=$(wget https://gbl.his.arc.azure.com/azcmagent-linux -O "$LINUX_INSTALL_SCRIPT" 2>&1);
+if [ $? != 0 ]; then wget -qO- --method=PUT --body-data="{\"subscriptionId\":\"$subscriptionId\",\"resourceGroup\":\"$resourceGroup\",\"tenantId\":\"$tenantId\",\"location\":\"$location\",\"correlationId\":\"$correlationId\",\"authType\":\"$authType\",\"operation\":\"onboarding\",\"messageType\":\"DownloadScriptFailed\",\"message\":\"$output\"}" "https://gbl.his.arc.azure.com/log" &> /dev/null || true; fi;
+echo "$output";
+
+# Install the hybrid agent
+bash "$LINUX_INSTALL_SCRIPT";
+sleep 5;
+
+# Run connect command
+sudo azcmagent connect --resource-group "$resourceGroup" --tenant-id "$tenantId" --location "$location" --subscription-id "$subscriptionId" --cloud "$cloud" --correlation-id "$correlationId";
+```
+   
+* Ejecutamos el script en el servidor y deberia figurar ya en azure.
 ---
 ### Instalar y probar snort
 
@@ -111,44 +144,9 @@ Ejecutar SNORT con la configuración ids.conf
 ```bash
 sudo snort -A console -i enp0s3 -c /etc/snort/snort.conf -k none
 ```
+Las alertas son almacenadas en /var/log/snort/snort.alert.fast
 
-## Configurar Azure Arc para visualizar el servidor on-premise como un recurso mas de azure
-
-### Pasos a seguir:
-* Ingresamos a Azure portal Azure Arc 
-* Machines 
-* Add a single machine 
-* Generamos y descargamos el script
-```bash
-export subscriptionId="a8cbb876-3c0b-41e0-914a-8b378aa251a1";
-export resourceGroup="testenvironment02";
-export tenantId="97ddd0b5-4ba0-4f0f-9887-6cc62ff2e6f6";
-export location="eastus";
-export authType="token";
-export correlationId="d651ce4a-6c03-4870-b798-6f7357156657";
-export cloud="AzureCloud";
-
-
-# Download the installation package
-LINUX_INSTALL_SCRIPT="/tmp/install_linux_azcmagent.sh"
-if [ -f "$LINUX_INSTALL_SCRIPT" ]; then rm -f "$LINUX_INSTALL_SCRIPT"; fi;
-output=$(wget https://gbl.his.arc.azure.com/azcmagent-linux -O "$LINUX_INSTALL_SCRIPT" 2>&1);
-if [ $? != 0 ]; then wget -qO- --method=PUT --body-data="{\"subscriptionId\":\"$subscriptionId\",\"resourceGroup\":\"$resourceGroup\",\"tenantId\":\"$tenantId\",\"location\":\"$location\",\"correlationId\":\"$correlationId\",\"authType\":\"$authType\",\"operation\":\"onboarding\",\"messageType\":\"DownloadScriptFailed\",\"message\":\"$output\"}" "https://gbl.his.arc.azure.com/log" &> /dev/null || true; fi;
-echo "$output";
-
-# Install the hybrid agent
-bash "$LINUX_INSTALL_SCRIPT";
-sleep 5;
-
-# Run connect command
-sudo azcmagent connect --resource-group "$resourceGroup" --tenant-id "$tenantId" --location "$location" --subscription-id "$subscriptionId" --cloud "$cloud" --correlation-id "$correlationId";
-```
-   
-* Ejecutamos el script en el servidor y deberia figurar ya en azure.
-
-
-
-
+* El siguiente paso es enviar las alertas a azure
 
 
 
