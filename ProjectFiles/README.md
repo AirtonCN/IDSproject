@@ -70,6 +70,19 @@ sudo azcmagent connect --resource-group "$resourceGroup" --tenant-id "$tenantId"
    
 * Ejecutamos el script en el servidor y deberia figurar ya en azure.
 ---
+### Instalar la extension Azure Monitor Agent en el servidor, desde el portal Azure
+
+* Ingresar al portal azure.
+* Buscar e ingreas a azure arc.
+* Seleccionar el servidor.
+* Ingresar a extensiones y dar clic en agregar.
+* Buscar y seleccionar Azure Monitor Agent for Linux.
+* En este caso nos topamos con el error de espacio insuficiente en el servidor, se tuvo que cambiar el disco a capacidad fija.
+* Validamos que el servicio este en activo.
+```
+sudo systemctl status azuremonitoragent
+```
+---
 ### Instalar y probar snort
 
 Instalar
@@ -126,7 +139,7 @@ Configurar Snort para ignorar ciertas IPs usando pass rules o HOME_NET en el arc
 
 Ip victima (linea 65)
 ```
-ipvar HOME_NET [192.168.1.201]  # solo tu host
+ipvar HOME_NET [192.168.1.201]
 ```
 IP de donde proviene el trafico (linea 75)
 ```
@@ -142,7 +155,7 @@ alert tcp any any -> $HOME_NET 22 (msg:"[Snort IDS] SSH Access Attempt"; sid:100
 ```
 Ejecutar SNORT con la configuración ids.conf
 ```bash
-sudo snort -A console -i enp0s3 -c /etc/snort/snort.conf -k none
+sudo snort -A console -i enp0s3 -c /etc/snort/ids.conf -k none
 ```
 Las alertas son almacenadas en /var/log/snort/snort.alert.fast
 
