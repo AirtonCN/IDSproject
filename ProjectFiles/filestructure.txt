@@ -1,0 +1,7 @@
+/home/administrator/snort/snortconfig/
+├── snort.lua
+├── classification.config
+├── reference.config
+└── rules/
+    └── snort3-community.rules
+└── logs/
