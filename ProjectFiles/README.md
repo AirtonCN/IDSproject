@@ -131,8 +131,6 @@ Subir archivo al server linux
 scp archivo.txt uadministrator@192.168.1.201:/home/usuario/
 ```
 
-
-
 ## Configurar IDS
 
 Configurar Snort para ignorar ciertas IPs usando pass rules o HOME_NET en el archivo /etc/snort/snort.conf, todo esto se configurara en otro archivo llamado, ids.conf:
