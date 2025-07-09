@@ -1,10 +1,10 @@
 
 export subscriptionId="a8cbb876-3c0b-41e0-914a-8b378aa251a1";
-export resourceGroup="testenvironment02";
+export resourceGroup="idstest01";
 export tenantId="97ddd0b5-4ba0-4f0f-9887-6cc62ff2e6f6";
 export location="eastus";
 export authType="token";
-export correlationId="9438c4fa-44bd-42da-ae8c-891d61cd73cd";
+export correlationId="c0d0d3ca-04e7-4cbb-8d25-93bb85e83abb";
 export cloud="AzureCloud";
 
 
@@ -20,4 +20,4 @@ bash "$LINUX_INSTALL_SCRIPT";
 sleep 5;
 
 # Run connect command
-sudo azcmagent connect --resource-group "$resourceGroup" --tenant-id "$tenantId" --location "$location" --subscription-id "$subscriptionId" --cloud "$cloud" --correlation-id "$correlationId";
+sudo azcmagent connect --resource-group "$resourceGroup" --tenant-id "$tenantId" --location "$location" --subscription-id "$subscriptionId" --cloud "$cloud" --tags 'secops=001,ArcSQLServerExtensionDeployment=Disabled' --correlation-id "$correlationId";
