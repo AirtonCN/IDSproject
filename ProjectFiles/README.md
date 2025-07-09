@@ -3,6 +3,9 @@
 ## Servidor (Linux)
 
 ### Configurar conectividad del servidor
+
+Se debe usar UBUNTU 22.04 para evitar problemas de compatibilidad.
+
 Verificar IP, interfaz enp0s3
 ```bash
 ip addr show enp0s3
@@ -35,6 +38,10 @@ sudo netplan try
 Aplicar cambios directamente
 ```bash
 sudo netplan apply
+```
+### Instalar OpenSSH para poder transferir archivos al servirdor
+```bash
+sudo apt install openssh-server
 ```
 ### Configurar Azure Arc para visualizar el servidor on-premise como un recurso mas de azure
 
@@ -70,13 +77,15 @@ sudo azcmagent connect --resource-group "$resourceGroup" --tenant-id "$tenantId"
    
 * Ejecutamos el script en el servidor y deberia figurar ya en azure.
 ---
-### Instalar la extension Azure Monitor Agent en el servidor, desde el portal Azure
+### Instalar la extension Log analytics agent en el servidor, desde el portal Azure
 
+* Microsoft ya no le brinda soporte a esta extension, pero aun puede usarse.
+* Crear un log analytics workspace llamado snortworkspace.
 * Ingresar al portal azure.
 * Buscar e ingreas a azure arc.
 * Seleccionar el servidor.
 * Ingresar a extensiones y dar clic en agregar.
-* Buscar y seleccionar Azure Monitor Agent for Linux.
+* Buscar y seleccionar Log analytics agent.
 * En este caso nos topamos con el error de espacio insuficiente en el servidor, se tuvo que cambiar el disco a capacidad fija.
 * Validamos que el servicio este en activo.
 ```
