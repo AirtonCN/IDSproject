@@ -117,24 +117,27 @@ sudo tcpdump -i enp0s3 | grep IP
 ```
 ---
 ## Cliente (Windows)
-Instalar nmap.
+
+Instalar nmap para el escaneo de puertos.
 https://nmap.org/
 
 Generar tráfico malicioso con nmap
 ```powershell
 nmap -sT -Pn 192.168.1.201
 ```
-Descargar archivo del server linux
+Algunos comandos para subir y descargar archivos de nuestro server donde esta el IDS.
 
-```powershell
-scp administrator@192.168.1.201:/home/usuario/snort.log 
-C:\Users\TuUsuario\Descargas\
-```
+* Descargar archivo del server linux
 
-Subir archivo al server linux
-```powershell
-scp archivo.txt uadministrator@192.168.1.201:/home/usuario/
-```
+  ```powershell
+  scp administrator@192.168.1.201:/home/usuario/snort.log 
+  C:\Users\TuUsuario\Descargas\
+  ```
+
+* Subir archivo al server linux
+  ```powershell
+  scp archivo.txt uadministrator@192.168.1.201:/home/usuario/
+  ```
 
 ## Configurar IDS
 
@@ -234,5 +237,11 @@ Las alertas son almacenadas en /var/log/snort/snort.alert.fast
   #habilitacion de una seguda interfaz en modo sniffer.
       enp0s8:
         dhcp4: false
+        dhcp6: false
         optional: true
   ```
+* Prueba con --daq afpacket en modo inlne, esto crea un puente de inspeccion entre ambas interfaces.
+  
+```bash
+  sudo snort -Q --daq afpacket -i enp0s8:enp0s3 -c /etc/snort/ids.conf -A console
+```
