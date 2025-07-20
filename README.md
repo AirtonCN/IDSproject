@@ -233,6 +233,6 @@ Las alertas son almacenadas en /var/log/snort/snort.alert.fast
           via: 192.168.1.1
   #habilitacion de una seguda interfaz en modo sniffer.
       enp0s8:
-        dchp4: false
+        dhcp4: false
         optional: true
   ```
