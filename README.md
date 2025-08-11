@@ -245,3 +245,4 @@ Las alertas son almacenadas en /var/log/snort/snort.alert.fast
 ```bash
   sudo snort -Q --daq afpacket -i enp0s8:enp0s3 -c /etc/snort/ids.conf -A console
 ```
+# Comandos usados en Git
