@@ -8,10 +8,12 @@ Verificar IP, interfaz enp0s3
 ip addr show enp0s3
 ```
 Desactivar servicio que impide iniciar rápido el servidor
+
+1
 ```bash
 systemctl disable systemd-networkd-wait-online.service
 ```
-
+2
 ```bash
 systemctl mask systemd-networkd-wait-online.service
 ```
