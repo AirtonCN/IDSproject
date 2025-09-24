@@ -18,7 +18,7 @@ systemctl disable systemd-networkd-wait-online.service
 systemctl mask systemd-networkd-wait-online.service
 ```
 
-Para onfigurar ip estatica directorio /etc/netplan, 
+Para configurar ip estatica directorio /etc/netplan, 
 
 * Realizar una copia del archivo 50-cloud-init.yaml
 
