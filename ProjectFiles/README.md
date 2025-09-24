@@ -2,11 +2,20 @@
 
 ## Servidor (Linux)
 
-### Configurar conectividad del servidor
+### Configurar servidor y conectividad
 Verificar IP, interfaz enp0s3
 ```bash
 ip addr show enp0s3
 ```
+Desactivar servicio que impide iniciar rápido el servidor
+```bash
+systemctl disable systemd-networkd-wait-online.service
+```
+
+```bash
+systemctl mask systemd-networkd-wait-online.service
+```
+
 Para onfigurar ip estatica directorio /etc/netplan, 
 
 * Realizar una copia del archivo 50-cloud-init.yaml
@@ -68,12 +77,15 @@ sleep 5;
 sudo azcmagent connect --resource-group "$resourceGroup" --tenant-id "$tenantId" --location "$location" --subscription-id "$subscriptionId" --cloud "$cloud" --correlation-id "$correlationId";
 ```
    
-* Ejecutamos el script en el servidor y deberia figurar ya en azure.
+* Ejecutamos el script en el servidor y deberia figurar ya en el apartado machines.
+```
+sudo ./OnboardingScript.sh
+```
 ---
 ### Instalar la extension Azure Monitor Agent en el servidor, desde el portal Azure
 
 * Ingresar al portal azure.
-* Buscar e ingreas a azure arc.
+* Buscar e ingrear a azure arc.
 * Seleccionar el servidor.
 * Ingresar a extensiones y dar clic en agregar.
 * Buscar y seleccionar Azure Monitor Agent for Linux.
@@ -83,13 +95,63 @@ sudo azcmagent connect --resource-group "$resourceGroup" --tenant-id "$tenantId"
 sudo systemctl status azuremonitoragent
 ```
 ---
-### Instalar y probar snort
+### Instalar y probar snort 3
 
-Instalar
-```bash
-sudo apt update 
-sudo apt install snort
-```
+Requiere muchas dependencias, se instalara como un contenedor docker. Se realizara un ajuste de modo que el archivo de configuracion lua y las reglas sean legibles desde el server, para ello se deben crear unas cuantas carpetas, se detalla en el archivo filestructure.txt.
+* Instalar docker.
+  ```bash
+  sudo apt install docker.io
+  ```
+* Descargar la imagen oficial de snort 3.
+  ```bash
+  docker pull ciscotalos/snort3
+  ```
+* Iniciar el contenedor snort ejecutar start.sh.
+  ```bash
+  docker run --name snort3 -h snort3 -u snorty -w /home/snorty -d -it ciscotalos/snort3 bash
+  ```
+* Copiar el archivo de configuracion .lua para que sea legible desde el server.
+  ```bash
+  docker cp snort3:/home/snorty/snort3/etc/snort/snort.lua /home/administrator/snort/snortconfig/snort.lua
+  ``` 
+* Copiar el archivo de reglas para que sea legible desde el server.
+  ```bash
+  docker cp snort3:/home/snorty/snort3/etc/rules/snort3-community.rules /home/administrator/snort/snortconfig/rules/
+  ```
+
+
+
+
+
+* Interactuar con el contenedor ejecutar interact.sh.
+  ```
+  docker exec -it snort3 bash
+  ```
+
+* Ejecutar el IDS.
+  ```bash
+  ```
+* Salir de la interaccion con snort 3.
+  ```bash
+  exit
+  ```
+* Detener el contenedor de snort 3.
+  ```bash
+  docker kill snort3
+  ```
+
+
+
+
+
+
+
+
+
+
+
+
+
 Verificar si la interfaz de red esta en modo promiscuo
 ```bash
 ip link show enp0s3
@@ -159,8 +221,27 @@ sudo snort -A console -i enp0s3 -c /etc/snort/ids.conf -k none
 ```
 Las alertas son almacenadas en /var/log/snort/snort.alert.fast
 
-* El siguiente paso es enviar las alertas a azure
+## Envio de logs a Azure portal
+* Crear un log analytics workspace llamado Snort-Alerts.
+* Crear un data collection endpoint llamado snort-dce.
+  ```bash
+  az monitor data-collection endpoint create \
+    --name snort-dce \
+    --resource-group testenvironment02 \
+    --location eastus \
+    --public-network-access "Enabled"
+  ```
 
+* Crear una tabla donde subiremos una muestra del log, la tabla se llama SnortAlerts_CL
+* Ingresamos a log analytics workspace en azure.
+* En apartado Agents > Linux.
+  * Creamos una DCR (Data collection rule) llamada SnortAlerts.
+  * Rellenamos los datos con nuestra tabla previamente creada y el data collection endpoing.
+  * En el apartado resources agregamos nuestro servidor previamente configurado con azure arc.
+  * En el siguiente apartado de dta collection rule, seleccionamos como source custom text log, como destino nuestro loganalytics workspace previamente creado.
+* En collect and deliver seleccionamos custom text log, ingresamos la ruta del log: /var/log/snort/snort.alert.fast
+  * 
+* 
 
 
 
