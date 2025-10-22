@@ -9,16 +9,24 @@ ip addr show enp0s3
 ```
 Desactivar servicio que impide iniciar rápido el servidor
 
-1
+
 ```bash
 systemctl disable systemd-networkd-wait-online.service
 ```
-2
+
 ```bash
 systemctl mask systemd-networkd-wait-online.service
 ```
 
 Para configurar ip estatica directorio /etc/netplan, 
+
+* Asegurarse que se tengan permisos -rw- para root en el archivo .yaml.
+
+* Desactivar el servicio cloud.init.
+
+```bash
+sudo touch /etc/cloud/cloud-init.disabled
+```
 
 * Realizar una copia del archivo 50-cloud-init.yaml
 
