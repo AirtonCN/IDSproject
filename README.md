@@ -6,6 +6,8 @@
 
 Se debe usar UBUNTU 22.04 para evitar problemas de compatibilidad.
 
+* Se recomienda desconectar la interfaz de internet durante la instalación y activar DHCP para conectarse por SSH y configurarlo más fácil.
+
 Verificar IP, interfaz enp0s3
 ```bash
 ip addr show enp0s3
