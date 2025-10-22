@@ -87,8 +87,16 @@ sleep 5;
 sudo azcmagent connect --resource-group "$resourceGroup" --tenant-id "$tenantId" --location "$location" --subscription-id "$subscriptionId" --cloud "$cloud" --correlation-id "$correlationId";
 ```
    
-* Ejecutamos el script en el servidor y deberia figurar ya en el apartado machines.
+* Ejecutamos el script en el servidor y deberia figurar ya en el apartado machines, validar que se tengan permisos de ejecucion.
+
+```bash
+sudo chmod +x OnboardingScript.sh
 ```
+---
+
+* Ejecutar el script
+
+```bash
 sudo ./OnboardingScript.sh
 ```
 ---
