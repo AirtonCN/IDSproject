@@ -1,30 +1,65 @@
-# Despliegue
+# IDS Project — Snort + Azure Monitor
 
-## Servidor (Linux)
+Sistema de detección de intrusiones (IDS) basado en Snort sobre Ubuntu 22.04, integrado con Azure Monitor para visualización centralizada de alertas. Incluye un entorno de pruebas controlado con GNS3 y un router Cisco 3725.
 
-### Configurar conectividad del servidor
+## Arquitectura
 
-Se debe usar UBUNTU 22.04 para evitar problemas de compatibilidad.
+```
+┌─────────────────┐        ┌──────────────────┐        ┌──────────────────────┐
+│ Windows (Client)│        │   GNS3 / Router  │        │  Ubuntu 22.04 Server │
+│                 │        │   Cisco 3725      │        │                      │
+│  nmap (ataque)  │──────▶ │  192.168.1.202   │──────▶ │  Snort IDS           │
+│  192.168.1.25   │        │                  │        │  192.168.1.201       │
+└─────────────────┘        └──────────────────┘        └──────────┬───────────┘
+                                                                   │
+                                                         Azure Monitor Agent
+                                                                   │
+                                                      ┌────────────▼────────────┐
+                                                      │   Azure Log Analytics   │
+                                                      │   Workspace             │
+                                                      │   SnortAlerts_CL        │
+                                                      └─────────────────────────┘
+```
 
-* Se recomienda desconectar la interfaz de internet durante la instalación y activar DHCP para conectarse por SSH y configurarlo más fácil.
+**Flujo de datos:** tráfico generado desde el cliente → capturado por Snort en `enp0s3` → alertas en `/var/log/snort/snort.alert.fast` → recolectadas por Azure Monitor Agent → tabla `SnortAlerts_CL` en Log Analytics.
 
-Verificar IP, interfaz enp0s3
+---
+
+## Prerrequisitos
+
+| Componente | Versión / Detalle |
+|---|---|
+| Ubuntu Server | 22.04 LTS |
+| Snort | 2.9.x (paquete `apt`) |
+| GNS3 Desktop + GNS3 VM | Última versión estable |
+| Imagen Cisco IOS | `c3725-adventerprisek9-mz.124-15.T14.image` |
+| Azure | Suscripción activa, Log Analytics Workspace creado |
+| Windows Client | nmap instalado |
+
+---
+
+## 1. Servidor (Ubuntu 22.04)
+
+### 1.1 Configurar red
+
+Se recomienda desconectar la interfaz de internet durante la instalación y activar DHCP para conectarse por SSH en el primer arranque.
+
+Verificar la interfaz principal:
 ```bash
 ip addr show enp0s3
 ```
-Para onfigurar ip estatica directorio /etc/netplan, 
 
-* Realizar una copia del archivo 50-cloud-init.yaml
+Realizar una copia de seguridad del archivo de netplan antes de modificarlo:
+```bash
+sudo cp /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.bak
+```
 
-* Asegurarse que se tengan permisos -rw- para root en el archivo .yaml.
-
-* Desactivar el servicio cloud.init.
-
+Deshabilitar cloud-init para que no sobreescriba la configuración:
 ```bash
 sudo touch /etc/cloud/cloud-init.disabled
 ```
 
-* Configurar IP fija reemplazando todo el contenido por esto
+Reemplazar el contenido de `/etc/netplan/50-cloud-init.yaml` con la siguiente configuración de IP estática:
 ```yaml
 network:
   version: 2
@@ -41,209 +76,280 @@ network:
       - to: default
         via: 192.168.1.1
 ```
-Probar config
+
+Probar y aplicar:
 ```bash
 sudo netplan try
-```
-Aplicar cambios directamente
-```bash
 sudo netplan apply
 ```
-### Instalar OpenSSH para poder transferir archivos al servirdor
+
+### 1.2 Instalar OpenSSH
+
 ```bash
 sudo apt install openssh-server
 ```
-### Configurar Azure Arc para visualizar el servidor on-premise como un recurso mas de azure
 
-Pasos a seguir:
-* Ingresamos a Azure portal Azure Arc 
-* Machines 
-* Add a single machine 
-* Generamos y descargamos el script
-* Ejecutamos el script en el servidor y deberia figurar ya en azure.
+### 1.3 Conectar a Azure Arc
 
-* Validar que se tengan permisos de ejecucion.
-
+1. Ingresar al portal Azure → **Azure Arc** → **Machines** → **Add a single machine**
+2. Generar y descargar el script de onboarding
+3. Transferir el script al servidor y darle permisos de ejecución:
 ```bash
 sudo chmod +x OnboardingScript.sh
-```
-
-* Ejecutar el script
-
-```bash
 sudo ./OnboardingScript.sh
 ```
+El servidor aparecerá como recurso en Azure Arc una vez completado.
 
----
-### Instalar la extension Azure Monitor Agent en el servidor, desde el portal Azure
+> **Nota de seguridad:** el script contiene `subscriptionId` y `tenantId`. Generar uno nuevo desde el portal si es necesario y no subirlo a repositorios públicos.
 
-* Ingresar al portal azure.
-* Buscar e ingrear a azure arc.
-* Seleccionar el servidor.
-* Ingresar a extensiones y dar clic en agregar.
-* Buscar y seleccionar Azure Monitor Agent for Linux.
-* En este caso nos topamos con el error de espacio insuficiente en el servidor, se tuvo que cambiar el disco a capacidad fija.
-* Validamos que el servicio este en activo.
+### 1.4 Instalar Azure Monitor Agent
 
+Desde el portal Azure:
+1. Azure Arc → seleccionar el servidor → **Extensions** → **Add**
+2. Buscar y seleccionar **Azure Monitor Agent for Linux**
+
+Verificar que el servicio esté activo:
 ```bash
 sudo systemctl status azuremonitoragent
 ```
----
-### Instalar y probar snort
 
-Instalar
+> **Problema conocido:** si aparece error de espacio insuficiente durante la instalación, cambiar el disco virtual a capacidad fija en la configuración de la VM.
+
+---
+
+## 2. IDS — Snort
+
+### 2.1 Instalación
+
 ```bash
-sudo apt update 
+sudo apt update
 sudo apt install snort
 ```
-Verificar si la interfaz de red esta en modo promiscuo
-```bash
-ip link show enp0s3
-```
-Habilitar el modo promiscuo en la interfaz deseada
+
+Habilitar modo promiscuo en la interfaz para capturar todo el tráfico de la red:
 ```bash
 sudo ip link set enp0s3 promisc on
 ```
-Ejecutar Snort con la interfaz enp0s en modo promiscuo
+
+Verificar que el modo esté activo (debe mostrar `PROMISC` en los flags):
 ```bash
-sudo snort -A console -i enp0s3 -c /etc/snort/snort.conf -k none
+ip link show enp0s3
 ```
-Verificar si la vm recibe tráfico
-```bash
-sudo tcpdump -i enp0s3
+
+### 2.2 Configuración (ids.conf)
+
+El archivo de configuración del proyecto se encuentra en `/etc/snort/ids.conf`. Las variables clave son:
+
 ```
-Verificar las ip de donde proviene el tráfico
-```bash
-sudo tcpdump -i enp0s3 | grep IP
-```
----
-## Cliente (Windows)
-
-Instalar nmap para el escaneo de puertos.
-https://nmap.org/
-
-Generar tráfico malicioso con nmap
-```powershell
-nmap -sT -Pn 192.168.1.201
-```
-Algunos comandos para subir y descargar archivos de nuestro server donde esta el IDS.
-
-* Descargar archivo del server linux
-
-  ```powershell
-  scp administrator@192.168.1.201:/home/usuario/snort.log 
-  C:\Users\TuUsuario\Descargas\
-  ```
-
-* Subir archivo al server linux
-  ```powershell
-  scp archivo.txt uadministrator@192.168.1.201:/home/usuario/
-  ```
-
-## Configurar IDS
-
-Configurar Snort para ignorar ciertas IPs usando pass rules o HOME_NET en el archivo /etc/snort/snort.conf, todo esto se configurara en otro archivo llamado, ids.conf:
-
-Ip victima (linea 65)
-```
+# Red protegida (servidor víctima)
 ipvar HOME_NET [192.168.1.201]
-```
-IP de donde proviene el trafico (linea 75)
-```
+
+# Origen del tráfico externo a monitorear
 ipvar EXTERNAL_NET [192.168.1.25]
 ```
-Verificar la configuracion del archivo .conf
+
+Validar que la configuración no tenga errores antes de ejecutar:
 ```bash
 sudo snort -T -c /etc/snort/ids.conf
 ```
-Se agrega una regla al archivo /etc/snort/rules/local.rules, para detectar intentos de conexión SSH
+
+### 2.3 Reglas (local.rules)
+
+Las reglas personalizadas se definen en `/etc/snort/rules/local.rules`. Regla actual:
+
 ```
+# Detecta intentos de conexión SSH al servidor
 alert tcp any any -> $HOME_NET 22 (msg:"[Snort IDS] SSH Access Attempt"; sid:1000010; rev:1;)
 ```
-Ejecutar SNORT con la configuración ids.conf
+
+Para agregar nuevas reglas, respetar el formato `sid` único (usar `1000011`, `1000012`, etc. para reglas propias).
+
+### 2.4 Ejecutar Snort
+
+**Modo IDS (pasivo) — monitoreo en consola:**
 ```bash
 sudo snort -A console -i enp0s3 -c /etc/snort/ids.conf -k none
 ```
-Las alertas son almacenadas en /var/log/snort/snort.alert.fast
 
-* El siguiente paso es enviar las alertas a azure
----
-## Crear un custom log en Azure para ver los registros de snort
-* Crear una tabla en el workspace, MMA-based, llamada SnortAlerts_CL, especificar ruta de logs de snort /var/log/snort/snort.alert.fast
-* Ahora podemos ver los logs la tabla en el workspace como texto plano en el portal azure.
-
-### Uso de Kusto Query Language para mostrar los logs de forma mas ordenada
-* En el apartado logs habilitamos la vista KQL mode e introducimos el siguiente query.
-  ```
-  SnortAlerts_CL
-  | extend
-      timestamp = extract(@"^(\d+/\d+-\d+:\d+:\d+\.\d+)", 1, RawData),
-      sid = extract(@"\[(\d+):(\d+):(\d+)\]", 0, RawData),
-      msg = extract(@"\]\s*(.*?)\s*\[\*\*\]", 1, RawData),
-      classification = extract(@"\[Classification:\s*(.*?)\]", 1, RawData),
-      priority = extract(@"\[Priority:\s*(\d+)\]", 1, RawData),
-      protocol = extract(@"\{(\w+)\}", 1, RawData),
-      src = extract(@"\}\s*([a-fA-F0-9:\.]+):(\d+)", 0, RawData),
-      src_ip = extract(@"\}\s*([a-fA-F0-9:\.]+):(\d+)", 1, RawData),
-      src_port = extract(@"\}\s*([a-fA-F0-9:\.]+):(\d+)", 2, RawData),
-      dst_ip = extract(@"->\s*([a-fA-F0-9:\.]+):(\d+)", 1, RawData),
-      dst_port = extract(@"->\s*([a-fA-F0-9:\.]+):(\d+)", 2, RawData)
-  | project timestamp, msg, classification, priority, protocol, src_ip, src_port, dst_ip, dst_port
-  | order by timestamp desc
-  ```
-
-# Montaje de un entorno controlado para pruebas del IDS/IPS
-* Descargar GNS3 y GNS3 VM.
-* Descargar la imagen del router cisco 3725 https://upw.io/8RU/c3725-adventerprisek9-mz.124-15.T14.image
-* Cargar la imagen en GNS3 Edit > Preferences > Dynamips > IOS Routers > New > GNS3 VM > Seleccionar la imagen > Ram 256MB
-* Seleccionamos dos adaptadores de red adicionales, NM-1FE-TX y NM-4T.
-* Seleccionamos WIC-1T en el siguiente slot.
-* Seleccionar Idle-PC finder, y usar el valor recomendado.
-* Descargar la imagen del switch ////
-
-## Configurar router
-* En dispositivos colocar un cloud y el router cisco previamente configurado.
-* Hacer doble clic en el nodo cloud y seleccionar la interfaz principal de nuestro equipo y retirar las demas.
-* Realizar la siguiente config en el router.
-  ```bash
-  enable
-  configure terminal
-  no service config
-  no service tcp-small-servers
-  no service udp-small-servers
-  exit
-  write memory
-  interface FastEthernet0/0
-  ip address 192.168.1.202 255.255.255.0
-  no shutdown
-  exit
-  ip route 0.0.0.0 0.0.0.0 192.168.1.1
-  ```
-* Nueva configuracion ip en el servidor, agregar un bridged adapter adicional y modificar archivo yaml netplan.
-  ```yaml
-  network:
-    version: 2
-    renderer: networkd
-    ethernets:
-      enp0s3:
-        dhcp4: false
-        addresses:
-          - 192.168.1.201/24
-        nameservers:
-          addresses:
-            - 192.168.1.1
-        routes:
-        - to: default
-          via: 192.168.1.1
-  #habilitacion de una seguda interfaz en modo sniffer.
-      enp0s8:
-        dhcp4: false
-        dhcp6: false
-        optional: true
-  ```
-* Prueba con --daq afpacket en modo inlne, esto crea un puente de inspeccion entre ambas interfaces.
-  
+**Modo IPS (inline) — inspección entre dos interfaces:**
 ```bash
-  sudo snort -Q --daq afpacket -i enp0s8:enp0s3 -c /etc/snort/ids.conf -A console
+sudo snort -Q --daq afpacket -i enp0s8:enp0s3 -c /etc/snort/ids.conf -A console
 ```
-# Comandos usados en Git
+Este modo requiere agregar una segunda interfaz `enp0s8` a la VM en modo bridged (ver sección 4).
+
+Las alertas se almacenan en:
+```
+/var/log/snort/snort.alert.fast
+```
+
+---
+
+## 3. Cliente (Windows)
+
+Instalar [nmap](https://nmap.org/) para la generación de tráfico de prueba.
+
+**Escaneo de puertos (simula reconocimiento):**
+```powershell
+nmap -sT -Pn 192.168.1.201
+```
+
+**Transferencia de archivos con el servidor:**
+
+Descargar log de Snort desde el servidor:
+```powershell
+scp administrator@192.168.1.201:/var/log/snort/snort.alert.fast C:\Users\TuUsuario\Descargas\
+```
+
+Subir archivo al servidor:
+```powershell
+scp archivo.txt administrator@192.168.1.201:/home/administrator/
+```
+
+---
+
+## 4. Entorno controlado (GNS3)
+
+### 4.1 Instalación
+
+1. Descargar GNS3 Desktop y GNS3 VM desde [gns3.com](https://www.gns3.com/)
+2. Descargar la imagen del router Cisco 3725: `c3725-adventerprisek9-mz.124-15.T14.image`
+3. En GNS3: **Edit → Preferences → Dynamips → IOS Routers → New → GNS3 VM**
+   - Seleccionar la imagen descargada
+   - RAM: 256 MB
+   - Adaptadores adicionales: `NM-1FE-TX` y `NM-4T`
+   - Slot WIC: `WIC-1T`
+4. Ejecutar **Idle-PC finder** y usar el valor recomendado (reduce el uso de CPU)
+
+**Switch:** usar el switch Ethernet integrado de GNS3 (Ethernet Switch) para topologías simples. Para funcionalidades avanzadas de Capa 2 se puede usar una imagen IOU L2.
+
+### 4.2 Topología y configuración del router
+
+En el canvas de GNS3, agregar:
+- Un nodo **Cloud** (conectado a la interfaz física del equipo host)
+- El router **Cisco 3725**
+
+Hacer doble clic en el nodo Cloud → seleccionar únicamente la interfaz de red principal del equipo host.
+
+Configurar el router (acceder con doble clic o consola):
+```
+enable
+configure terminal
+no service config
+no service tcp-small-servers
+no service udp-small-servers
+interface FastEthernet0/0
+ ip address 192.168.1.202 255.255.255.0
+ no shutdown
+ exit
+ip route 0.0.0.0 0.0.0.0 192.168.1.1
+write memory
+```
+
+### 4.3 Configurar segunda interfaz para modo inline (IPS)
+
+Agregar un segundo adaptador de red bridged a la VM Ubuntu en VirtualBox/VMware.
+
+Actualizar `/etc/netplan/50-cloud-init.yaml` para incluir la segunda interfaz:
+```yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp0s3:
+      dhcp4: false
+      addresses:
+        - 192.168.1.201/24
+      nameservers:
+        addresses:
+          - 192.168.1.1
+      routes:
+      - to: default
+        via: 192.168.1.1
+    enp0s8:
+      dhcp4: false
+      dhcp6: false
+      optional: true
+```
+
+Aplicar cambios:
+```bash
+sudo netplan apply
+```
+
+---
+
+## 5. Integración con Azure
+
+### 5.1 Crear tabla de logs personalizada
+
+En el portal Azure → Log Analytics Workspace:
+1. **Tables → Create → New custom log (MMA-based)**
+2. Nombre de la tabla: `SnortAlerts_CL`
+3. Ruta del log en el servidor: `/var/log/snort/snort.alert.fast`
+
+Los registros comenzarán a aparecer como texto plano en la tabla después de algunos minutos.
+
+### 5.2 Consulta KQL para parsear alertas
+
+En **Logs** del workspace, activar el modo KQL e introducir:
+
+```kql
+SnortAlerts_CL
+| extend
+    timestamp      = extract(@"^(\d+/\d+-\d+:\d+:\d+\.\d+)", 1, RawData),
+    sid            = extract(@"\[(\d+):(\d+):(\d+)\]", 0, RawData),
+    msg            = extract(@"\]\s*(.*?)\s*\[\*\*\]", 1, RawData),
+    classification = extract(@"\[Classification:\s*(.*?)\]", 1, RawData),
+    priority       = extract(@"\[Priority:\s*(\d+)\]", 1, RawData),
+    protocol       = extract(@"\{(\w+)\}", 1, RawData),
+    src_ip         = extract(@"\}\s*([a-fA-F0-9:\.]+):(\d+)", 1, RawData),
+    src_port       = extract(@"\}\s*([a-fA-F0-9:\.]+):(\d+)", 2, RawData),
+    dst_ip         = extract(@"->\s*([a-fA-F0-9:\.]+):(\d+)", 1, RawData),
+    dst_port       = extract(@"->\s*([a-fA-F0-9:\.]+):(\d+)", 2, RawData)
+| project timestamp, msg, classification, priority, protocol, src_ip, src_port, dst_ip, dst_port
+| order by timestamp desc
+```
+
+---
+
+## 6. Verificación end-to-end
+
+1. **Verificar tráfico en la interfaz del servidor:**
+   ```bash
+   sudo tcpdump -i enp0s3 | grep IP
+   ```
+
+2. **Ejecutar Snort y generar tráfico desde el cliente:**
+   ```bash
+   # En el servidor
+   sudo snort -A console -i enp0s3 -c /etc/snort/ids.conf -k none
+   ```
+   ```powershell
+   # En el cliente Windows
+   nmap -sT -Pn 192.168.1.201
+   ```
+   Deben aparecer alertas en la consola del servidor.
+
+3. **Verificar que los logs se escriben:**
+   ```bash
+   tail -f /var/log/snort/snort.alert.fast
+   ```
+
+4. **Verificar que Azure Monitor Agent está enviando datos:**
+   ```bash
+   sudo systemctl status azuremonitoragent
+   ```
+   En el portal, ejecutar la query KQL — los datos pueden demorar 5-10 minutos en aparecer por primera vez.
+
+---
+
+## 7. Troubleshooting
+
+| Problema | Causa probable | Solución |
+|---|---|---|
+| Snort no detecta tráfico | Interfaz no está en modo promiscuo | `sudo ip link set enp0s3 promisc on` |
+| Error `FATAL` al validar con `-T` | Falta la flag `-i <interfaz>` en modo test | `sudo snort -T -i enp0s3 -c /etc/snort/ids.conf` |
+| Azure Monitor Agent no instala | Espacio insuficiente en disco | Cambiar el disco virtual a capacidad fija en la VM |
+| Logs no aparecen en Azure | Data Collection Rule no configurada | Verificar DCR asociada al workspace en Azure Monitor |
+| Router GNS3 consume 100% CPU | Falta valor Idle-PC | Ejecutar Idle-PC finder y aplicar el valor recomendado |
+| Modo inline no funciona | Segunda interfaz no disponible | Verificar que `enp0s8` aparece con `ip link show` |
