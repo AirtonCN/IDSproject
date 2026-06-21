@@ -1,0 +1,20 @@
+services:
+  snort3:
+    image: ciscotalos/snort3
+    container_name: snort3-ids
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./snort3/snort.lua:/usr/local/etc/snort/snort.lua:ro
+      - ./snort3/rules:/usr/local/etc/snort/rules:ro
+      - ./logs/snort:/var/log/snort
+    command: >
+      snort
+      -i enp0s3
+      -c /usr/local/etc/snort/snort.lua
+      -A fast
+      -l /var/log/snort
+      --plugin-path /usr/local/lib/snort_extra
+    restart: unless-stopped

@@ -1,0 +1,11 @@
+[
+  {
+    "RawData": "06/21-00:00:03.574686  [**] [1:1917:6] SCAN UPnP service discover attempt [**] [Classification: Detection of a Network Scan] [Priority: 3] {UDP} 192.168.1.27:65231 -> 239.255.255.250:1900"
+  },
+  {
+    "RawData": "06/21-00:00:11.833288  [**] [1:1917:6] SCAN UPnP service discover attempt [**] [Classification: Detection of a Network Scan] [Priority: 3] {UDP} 192.168.1.11:63780 -> 239.255.255.250:1900"
+  },
+  {
+    "RawData": "06/21-00:00:12.845431  [**] [1:1917:6] SCAN UPnP service discover attempt [**] [Classification: Detection of a Network Scan] [Priority: 3] {UDP} 192.168.1.11:63780 -> 239.255.255.250:1900"
+  }
+]

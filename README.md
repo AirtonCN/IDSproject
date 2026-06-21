@@ -105,8 +105,25 @@ El servidor aparecerá como recurso en Azure Arc una vez completado.
 ### 1.4 Instalar Azure Monitor Agent
 
 Desde el portal Azure:
-1. Azure Arc → seleccionar el servidor → **Extensions** → **Add**
-2. Buscar y seleccionar **Azure Monitor Agent for Linux**
+1. Instalar la extensi[on Azure Monitor Agent (AMA), desde Azure arc > Machines > Tu servidor > Settings > Extensiones
+2. Crear un log analytics workspace, en este caso se llamará **snortlogs**
+3. Crear el data collection endpoint con nombre "DCE-Snort" dese Monitor > Setings > Data collection endpoints.
+4. Añadir el servidor como recurso en el DCE-Snort > Configuration > Resources.
+5. Crear la tabla SnortAlerts_CL desde Log Analytics  
+
+```
+az monitor log-analytics workspace get-shared-keys \
+  --resource-group "resource_groupname" \
+  --workspace-name "snortlogs" \
+  --query "{Primary_Key: primarySharedKey, Secondary_Key: secondarySharedKey}" \
+  --output json
+```
+3. Validar que el OMS agent esté en ejecución.
+```
+sudo /opt/microsoft/omsagent/bin/omsadmin.sh -l
+```
+4. Azure Arc → seleccionar el servidor → **Extensions** → **Add**
+2. Buscar y seleccionar **Azure Log Analytics Agent** > Colocar el ID y primary key.
 
 Verificar que el servicio esté activo:
 ```bash
