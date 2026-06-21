@@ -105,30 +105,26 @@ El servidor aparecerá como recurso en Azure Arc una vez completado.
 ### 1.4 Instalar Azure Monitor Agent
 
 Desde el portal Azure:
-1. Instalar la extensi[on Azure Monitor Agent (AMA), desde Azure arc > Machines > Tu servidor > Settings > Extensiones
-2. Crear un log analytics workspace, en este caso se llamará **snortlogs**
-3. Crear el data collection endpoint con nombre "DCE-Snort" dese Monitor > Setings > Data collection endpoints.
-4. Añadir el servidor como recurso en el DCE-Snort > Configuration > Resources.
-5. Crear la tabla SnortAlerts_CL desde Log Analytics  
-
-```
-az monitor log-analytics workspace get-shared-keys \
-  --resource-group "resource_groupname" \
-  --workspace-name "snortlogs" \
-  --query "{Primary_Key: primarySharedKey, Secondary_Key: secondarySharedKey}" \
-  --output json
-```
-3. Validar que el OMS agent esté en ejecución.
-```
-sudo /opt/microsoft/omsagent/bin/omsadmin.sh -l
-```
-4. Azure Arc → seleccionar el servidor → **Extensions** → **Add**
-2. Buscar y seleccionar **Azure Log Analytics Agent** > Colocar el ID y primary key.
-
-Verificar que el servicio esté activo:
+1. Instalar la extensi[on Azure Monitor Agent (AMA), desde Azure arc > Machines > Tu servidor > Settings > Extensiones. Verificar que el servicio esté activo:
 ```bash
 sudo systemctl status azuremonitoragent
 ```
+2. Crear un log analytics workspace, en este caso se llamará **snortlogs**
+3. Crear el data collection endpoint con nombre "DCE-Snort" desde Monitor > Setings > Data collection endpoints.
+4. Añadir el servidor como recurso en el DCE-Snort > Configuration > Resources.
+5. Crear la tabla SnortAlerts_CL desde Log Analytics Workspace > snortlogs > Settings > Tables > Seleccionar el DCE > Crear una DCR nueva con nombre DCR-Snort > Subir el archivo logsample.json > Editar la transformación source | TimeGenerated = now()
+6. Ir a la DCR-Snort desde Monitor > Setings > Data collection rules.
+7. Dentro de la DCR seleccionar Configuration > Resources > Añadir el servidor.
+8. Dentro de la DCR añadir una data source en Configuration > Data sources.
+9. Ejecutar snort con el siguiente comando para generar logs.
+```
+sudo snort -A console -i enp0s3 -c /etc/snort/snort.conf -k none
+```
+10. Ingresar a Log Analytics Workspace e introducir la consulta KQL desde Logs > KQL mode (Esquina superior derecha).
+```
+
+
+
 
 > **Problema conocido:** si aparece error de espacio insuficiente durante la instalación, cambiar el disco virtual a capacidad fija en la configuración de la VM.
 
