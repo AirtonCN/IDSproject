@@ -122,7 +122,9 @@ sudo snort -A console -i enp0s3 -c /etc/snort/snort.conf -k none
 ```
 10. Ingresar a Log Analytics Workspace e introducir la consulta KQL desde Logs > KQL mode (Esquina superior derecha).
 ```
-
+SnortAlerts_CL
+| take 10
+```
 
 
 
