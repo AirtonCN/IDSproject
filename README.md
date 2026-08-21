@@ -667,29 +667,84 @@ Esto abre un túnel SSH a través de Azure Arc sin necesidad de exponer el servi
 
 ---
 
-## 5. Cliente Windows (generación de tráfico de prueba)
+## 5. Cliente atacante — Kali Linux en GNS3
 
-Instalar [nmap](https://nmap.org/) para simular ataques y reconocimiento.
+### 5.1 Agregar Kali a GNS3
 
-**Escaneo TCP (detectable por Snort):**
-```powershell
-nmap -sT -Pn 192.168.1.201
+1. Descargar **Kali Linux VirtualBox (64-bit)** desde [kali.org/get-kali/#kali-virtual-machines](https://www.kali.org/get-kali/#kali-virtual-machines) — formato `.7z` con archivos `.vbox` y `.vdi`
+2. En VirtualBox: **Machine → Add...** → seleccionar el archivo `.vbox`
+3. En GNS3: **Edit → Preferences → VirtualBox VMs → New** → seleccionar Kali → **Adapters: 1**
+4. En el canvas: conectar Kali a **Switch1** (mismo switch que el resto de clientes)
+
+Credenciales por defecto de la imagen prebuilt: `kali` / `kali`
+
+### 5.2 Configuración de red persistente
+
+Kali usa `NetworkManager`/`ifupdown`, no netplan. Editar `/etc/network/interfaces`:
+
+```bash
+sudo nano /etc/network/interfaces
 ```
 
-**Escaneo SYN (más rápido, detectable por la regla de port scan):**
-```powershell
-nmap -sS -Pn 192.168.1.201
+```
+source /etc/network/interfaces.d/*
+
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+    address 192.168.1.50
+    netmask 255.255.255.0
+    gateway 192.168.1.1
 ```
 
-**Intento de conexión SSH (activa la regla `sid:1000010`):**
-```powershell
-ssh administrator@192.168.1.201
+Aplicar:
+```bash
+sudo systemctl restart networking
 ```
 
-**Descargar log de Snort desde el servidor:**
-```powershell
-scp administrator@192.168.1.201:/var/log/snort/snort.alert.fast C:\Users\TuUsuario\Descargas\
+La IP persiste entre reinicios — no es necesario reconfigurar cada sesión.
+
+### 5.3 Reglas de detección en Snort
+
+Agregar en `/etc/snort/rules/local.rules` del servidor linux02:
+
 ```
+# Ping sweep — reconocimiento de hosts activos
+alert icmp any any -> $HOME_NET any (msg:"[Snort IDS] ICMP Ping Sweep"; itype:8; threshold: type both, track by_src, count 5, seconds 2; sid:1000012; rev:1;)
+
+# XMAS Scan — escaneo sigiloso (flags FIN+PSH+URG)
+alert tcp any any -> $HOME_NET any (msg:"[Snort IDS] XMAS Scan Detected"; flags:FPU; sid:1000013; rev:1;)
+
+# FTP Brute Force — múltiples intentos de login
+alert tcp any any -> $HOME_NET 21 (msg:"[Snort IDS] FTP Brute Force Attempt"; flow:to_server,established; content:"USER"; nocase; threshold: type both, track by_src, count 5, seconds 30; sid:1000014; rev:1;)
+
+# SQL Injection via HTTP
+alert tcp any any -> $HOME_NET 80 (msg:"[Snort IDS] HTTP SQL Injection Attempt"; flow:to_server,established; pcre:"/(\bSELECT\b|\bUNION\b|\bDROP\b|\bINSERT\b)/i"; sid:1000015; rev:1;)
+
+# Telnet — protocolo inseguro
+alert tcp any any -> $HOME_NET 23 (msg:"[Snort IDS] Telnet Access Attempt"; flags:S; sid:1000016; rev:1;)
+```
+
+Reiniciar Snort después de agregar reglas:
+```bash
+sudo snort -Q --daq afpacket -i enp0s3:enp0s8 -c /etc/snort/snort.conf -A console
+```
+
+### 5.4 Generar tráfico de ataque desde Kali
+
+| Ataque | Comando | Regla que dispara |
+|---|---|---|
+| Ping sweep | `ping -c 20 192.168.1.202` | `sid:1000012` |
+| XMAS scan | `nmap -sX -Pn 192.168.1.202` | `sid:1000013` |
+| FTP brute force | `hydra -l admin -P /usr/share/wordlists/rockyou.txt ftp://192.168.1.202` | `sid:1000014` |
+| SQL injection | `curl "http://192.168.1.202/index.php?id=1' UNION SELECT 1,2--"` | `sid:1000015` |
+| Telnet | `telnet 192.168.1.202` | `sid:1000016` |
+| SSH attempt | `ssh sysadmin@192.168.1.202` | `sid:1000010` |
+| Port scan SYN | `nmap -sS -Pn 192.168.1.202` | `sid:1000011` |
+
+> Los ataques apuntan a `192.168.1.202` (linux02/enp0s9) porque es el único host con servicios activos. R1 (192.168.1.1) solo tiene fa0/1 configurado sin servicios.
 
 ---
 
