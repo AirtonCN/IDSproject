@@ -4,4 +4,17 @@
 # ----------------
 # This file intentionally does not come with signatures.  Put your local
 # additions here.
-alert tcp any any -> $HOME_NET 22 (msg:"[Snort IDS] SSH Access Attempt"; sid:1000010; rev:1;)
+# 1. ICMP Ping Sweep - reconocimiento de hosts
+drop icmp any any -> $HOME_NET any (msg:"[Snort IPS] ICMP Ping Sweep"; itype:8; threshold: type both, track by_src, count 5, seconds 5; sid:1000012; rev:1;)
+
+# 2. XMAS Scan - escaneo sigiloso (flags FIN+PSH+URG)
+drop tcp any any -> $HOME_NET any (msg:"[Snort IPS] XMAS Scan Detected"; flags:FPU; sid:1000013; rev:1;)
+
+# 3. FTP Brute Force - multiples intentos de login
+drop tcp any any -> $HOME_NET 21 (msg:"[Snort IPS] FTP Brute Force Attempt"; flow:to_server,established; content:"USER"; nocase; threshold: type both, track by_src, count 5, seconds 30; sid:1000014; rev:1;)
+
+# 4. SQL Injection via HTTP
+drop tcp any any -> $HOME_NET 80 (msg:"[Snort IPS] HTTP SQL Injection Attempt"; flow:to_server,established; pcre:"/(\bSELECT\b|\bUNION\b|\bDROP\b|\bINSERT\b)/i"; sid:1000015; rev:1;)
+
+# 5. Telnet - protocolo inseguro
+drop tcp any any -> $HOME_NET 23 (msg:"[Snort IPS] Telnet Access Attempt"; flags:S; sid:1000016; rev:1;)
